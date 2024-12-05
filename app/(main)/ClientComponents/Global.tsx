@@ -1,20 +1,39 @@
-import { GetNezhaData } from "@/lib/serverFetch";
+"use client";
+
+import { ServerApi } from "@/app/types/nezha-api";
+import { nezhaFetcher } from "@/lib/utils";
+import useSWR from "swr";
 
 import { geoJsonString } from "../../../lib/geo-json-string";
 import GlobalInfo from "./GlobalInfo";
+import GlobalLoading from "./GlobalLoading";
 import { InteractiveMap } from "./InteractiveMap";
 
-export default async function ServerGlobal() {
-  const nezhaServerList = await GetNezhaData();
+export default function ServerGlobal() {
+  const { data: nezhaServerList, error } = useSWR<ServerApi>(
+    "/api/server",
+    nezhaFetcher,
+  );
 
-  const countrytList: string[] = [];
+  if (error)
+    return (
+      <div className="flex flex-col items-center justify-center">
+        <p className="text-sm font-medium opacity-40">{error.message}</p>
+      </div>
+    );
+
+  if (!nezhaServerList) {
+    return <GlobalLoading />;
+  }
+
+  const countryList: string[] = [];
   const serverCounts: { [key: string]: number } = {};
 
   nezhaServerList.result.forEach((server) => {
     if (server.host.CountryCode) {
       const countryCode = server.host.CountryCode.toUpperCase();
-      if (!countrytList.includes(countryCode)) {
-        countrytList.push(countryCode);
+      if (!countryList.includes(countryCode)) {
+        countryList.push(countryCode);
       }
       serverCounts[countryCode] = (serverCounts[countryCode] || 0) + 1;
     }
@@ -25,15 +44,15 @@ export default async function ServerGlobal() {
 
   const geoJson = JSON.parse(geoJsonString);
   const filteredFeatures = geoJson.features.filter(
-    (feature: any) => feature.properties.iso_a3 !== "",
+    (feature: any) => feature.properties.iso_a3_eh !== "",
   );
 
   return (
     <section className="flex flex-col gap-4 mt-[3.2px]">
-      <GlobalInfo countries={countrytList} />
+      <GlobalInfo countries={countryList} />
       <div className="w-full overflow-x-auto">
         <InteractiveMap
-          countries={countrytList}
+          countries={countryList}
           serverCounts={serverCounts}
           width={width}
           height={height}
